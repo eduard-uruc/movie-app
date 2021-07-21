@@ -185,7 +185,6 @@ export default class Movies extends React.Component {
                             </TableRow>
                         </TableHead>
 
-
                         <TableBody>
                             {items.map((item, i) => (
                                 <TableRow key={i} >
