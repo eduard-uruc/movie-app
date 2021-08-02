@@ -1,12 +1,9 @@
-window.React = require('react');
-import React from "react";
-import "../App.css";
-import SortableTable from 'react-sortable-table';
+import React from 'react';
 import { fetchMovies, fetchGenres } from "../models/fetchData";
+import SortableTable from 'react-sortable-table';
 import StarBorderIcon from "@material-ui/icons/StarBorder";
 import sortArray from "../utils/sortArray";
 import Tooltip from '@material-ui/core/Tooltip';
-import MenuItem from "@material-ui/core/MenuItem";
 import moment from 'moment';
 
 function getFamilyName(name) {
@@ -40,29 +37,18 @@ const FamilyNameSorter = {
     }
 };
 
-export default class App22 extends React.Component {
-    constructor() {
-        super()
+
+export default class Characters extends React.Component {
+    constructor(props) {
+        super(props);
         this.state = {
-            isLoading: true,
             items: [],
-            title: "",
-            genre: "",
-            year: null,
-            page: 1,
             genreList: [],
         };
     }
 
     componentDidMount() {
-        const { genre, title, page } = this.state;
-        const favoritesList = JSON.parse(localStorage.getItem("favorites"))
-
-        this.getGenresList();
-        this.generateDocument(genre, title, page);
-
-        // create localStorage array for favorite movies (only if it's not created yet)
-        !favoritesList && localStorage.setItem("favorites", JSON.stringify([]));
+        this.generateDocument(1);
     }
 
     render() {
@@ -125,38 +111,6 @@ export default class App22 extends React.Component {
         );
     }
 
-    componentDidUpdate(prevProps, prevState) {
-        const { genre, title, page } = this.state;
-
-        if (prevState.genre !== genre || prevState.title !== title) {
-            this.generateDocument(genre, title, page);
-        }
-    }
-
-    handleGenre = (event) => {
-        this.setState({ genre: event.target.value });
-    }
-
-    handleTitle = (event) => {
-        this.setState({ title: event.target.value });
-    }
-
-    // options fot the << title >> dropdown list used for filtering
-    optionsGenres = () => {
-        const { genreList } = this.state;
-
-        return genreList.map((item, index) => {
-            return <MenuItem key={index} value={item.id} onChange={(e) => this.handleGenre(e)}>{item.name}</MenuItem>;
-        })
-    }
-
-    clearFilter = () => {
-        this.setState({
-            genre: "",
-            title: ""
-        })
-    }
-
     // because a movie falls into several genres, we created a genre list per movie
     renderGenres = (genre_ids) => {
         const { genreList } = this.state;
@@ -181,51 +135,25 @@ export default class App22 extends React.Component {
         return newArr;
     }
 
-    generateDocument = (genreFilter, titleFilter, currentPage) => {
+    generateDocument = (currentPage) => {
+        const favorites = JSON.parse(localStorage.getItem("favorites"))
+
         fetchMovies(currentPage)
-            // filter by genre
+            // extract only favorite movies
             .then(res => {
-                if (genreFilter && res) {
-                    return res.results.filter(item => item.genre_ids.includes(genreFilter))
-                } else {
-                    return res.results
-                }
-            })
-            // filter by title
-            .then(result => {
-                // return only those movies where the title is similar to the searched word
-                if (titleFilter) {
-                    return result.filter((movie) => {
-                        let string = movie.title ? movie.title : movie.name;
-                        string = string.toLowerCase();
-                        let regex = new RegExp(titleFilter.toLowerCase(), "g");
-
-                        if (string.match(regex)) {
-                            /*Match found */
-                            return movie;
-                        }
-                    });
-                }
-                // return all results if the << title >> filter is not used
-                else {
-
-                    return result;
-                }
+                return res.results.filter(item => favorites.includes(item.id));
             })
             .then((filteredData) => {
-                // get favorite movies from localStorage
-                const favoritesList = JSON.parse(localStorage.getItem("favorites"))
                 const newData = [];
 
                 filteredData.map((movie) => {
-                    const isFavorite = favoritesList.includes(movie.id);
                     const ReleaseDate = movie.release_date ? movie.release_date : movie.first_air_date;
                     const Title = movie.title ? movie.title : movie.name;
                     const Favorite =
-                        <Tooltip title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}>
+                        <Tooltip title="Remove from Favorites">
                             <StarBorderIcon
                                 onClick={() => this.manageFavorites(movie.id)}
-                                sx={{ color: isFavorite ? "yellow" : null }} // color the icon if the movie is added to favorites
+                                sx={{ color: "yellow" }}
                                 className="favorite-icon"
                             />
                         </Tooltip>;
@@ -234,20 +162,17 @@ export default class App22 extends React.Component {
                         id: movie.id,
                         title: Title,
                         release_date: moment(ReleaseDate).format('L'),
-                        isFavorite,
+                        isFavorite: true,
                         genres: this.renderGenres(movie.genre_ids),
                         poster: <img src={`https://image.tmdb.org/t/p/w500/${movie.poster_path}`} alt={movie.title} className="movie-poster" />,
                         favorites: Favorite
                     });
-                })
+                });
 
                 // sort movies ascending
                 const sortedArray = sortArray(newData, "title", false);
 
-                this.setState({
-                    items: sortedArray,
-                    isLoading: false
-                });
+                this.setState({ items: sortedArray });
             })
             .catch((err) => {
                 console.log("An error occurred trying to fetch movies. " + err);
@@ -267,28 +192,20 @@ export default class App22 extends React.Component {
     }
 
     manageFavorites = (id) => {
-        const { genre, title, page } = this.state;
         // retrive favorite movies from localStorage
         let favoritesArray = JSON.parse(localStorage.getItem("favorites"));
-        // check if it"s already saved
-        const isAlreadySaved = favoritesArray.includes(id);
 
-        // onClick, if it"s already saved, remove the movie from favorites
-        if (isAlreadySaved) {
-            const index = favoritesArray.indexOf(id);
-            if (index > -1) {
-                favoritesArray.splice(index, 1);
-            }
-        }
-        // if it"s not saved then add it to favorites
-        else {
-            favoritesArray.push(id);
+        //  remove the movie from favorites
+        const index = favoritesArray.indexOf(id);
+        if (index > -1) {
+            favoritesArray.splice(index, 1);
         }
 
         // update data in localStorage
         localStorage.setItem("favorites", JSON.stringify(favoritesArray));
 
         // refresh table content
-        this.generateDocument(genre, title, page);
+        this.generateDocument(1);
     }
+
 }
